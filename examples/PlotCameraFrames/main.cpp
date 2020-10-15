@@ -3,7 +3,7 @@
 #include "Eigen/Core"
 #include "Eigen/Geometry"
 #include <fstream>
-void loadCameraPose(const std::string &strFile, std::vector<Eigen::Matrix4d> &poses)
+void loadCameraPose(const std::string &strFile, std::vector<Eigen::Matrix4d> &poses, std::vector<Eigen::Matrix4d> &poses1)
 {
     std::ifstream f;
     f.open(strFile.c_str());
@@ -23,8 +23,9 @@ void loadCameraPose(const std::string &strFile, std::vector<Eigen::Matrix4d> &po
             std::stringstream ss;
             ss << s;
             double aax,aay,aaz, tx, ty,tz;
+            double aax1,aay1,aaz1, tx1, ty1,tz1;
 
-            ss >> aax >> aay >> aaz >> tx >> ty >> tz;
+            ss >> aax >> aay >> aaz >> tx >> ty >> tz >> aax1 >> aay1 >> aaz1 >> tx1 >> ty1 >> tz1;
 
             double angle = Eigen::Vector3d(aax, aay, aaz).norm();
 
@@ -37,16 +38,34 @@ void loadCameraPose(const std::string &strFile, std::vector<Eigen::Matrix4d> &po
 
             poses.push_back(pose);
 
+
+            //
+
+            double angle1 = Eigen::Vector3d(aax1, aay1, aaz1).norm();
+
+
+            Eigen::Quaterniond q1(Eigen::AngleAxisd(angle1, Eigen::Vector3d(aax1, aay1, aaz1).normalized()));
+
+            Eigen::Matrix4d pose1;
+            pose1.topLeftCorner(3,3) = q1.toRotationMatrix();
+            pose1.topRightCorner(3,1) = Eigen::Vector3d(tx1, ty1, tz1);
+
+            poses1.push_back(pose1);
+
         }
     }
 }
 
 
-void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc)
+void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc, float r, float g, float b, float width=2, float scale =1)
 {
-    const float &w = 1;
-    const float h = w*0.75;
-    const float z = w*0.6;
+     float w = 1 ;
+     float h = w*0.75;
+     float z = w*0.6;
+
+    w *= scale;
+    h *= scale;
+    z *= scale;
 
     glPushMatrix();
 
@@ -56,8 +75,8 @@ void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc)
     glMultMatrixd(Twc.m);
 #endif
 
-    glLineWidth(1);
-    glColor3f(0.0f,1.0f,0.0f);
+    glLineWidth(width);
+    glColor3f(r,g,b);
     glBegin(GL_LINES);
     glVertex3f(0,0,0);
     glVertex3f(w,h,z);
@@ -137,17 +156,14 @@ void GetCurrentOpenGLCameraMatrix(const Eigen::Matrix4d T_wc, pangolin::OpenGlMa
 
 }
 
-
-
-
-
 int main( int /*argc*/, char** /*argv*/ )
 {
 
-    std::string pose_file = "/home/pang/camera_extrinsic.txt";
+    std::string pose_file = "/home/pang/software/Pangolin/examples/PlotCameraFrames/data.txt";
     std::vector<Eigen::Matrix4d> poses;
+    std::vector<Eigen::Matrix4d> poses1;
 
-    loadCameraPose(pose_file, poses);
+    loadCameraPose(pose_file, poses, poses1);
 
     std::cout << "load poses: " << poses.size() << std::endl;
     pangolin::CreateWindowAndBind("Main",640,480);
@@ -168,6 +184,7 @@ int main( int /*argc*/, char** /*argv*/ )
 
     int cnt = 0;
     Eigen::Matrix4d pose;
+    Eigen::Matrix4d pose1;
     while( !pangolin::ShouldQuit() )
     {
         // Clear screen and activate view to render into
@@ -179,12 +196,15 @@ int main( int /*argc*/, char** /*argv*/ )
 
         if (cnt < poses.size()) {
             pose = poses.at(cnt);
+            pose1 = poses1.at(cnt);
         }
 
-        pangolin::OpenGlMatrix M;
+        pangolin::OpenGlMatrix M, M1;
         GetCurrentOpenGLCameraMatrix(pose, M);
+        GetCurrentOpenGLCameraMatrix(pose1, M1);
 
-        DrawCurrentCamera(M);
+        DrawCurrentCamera(M, 0.0, 0.95, 0.1,1);
+        DrawCurrentCamera(M1, 0.70, 0.0, 0.1, 3,1.5);
 
 
         cnt ++;
